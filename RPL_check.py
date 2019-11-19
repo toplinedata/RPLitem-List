@@ -14,6 +14,7 @@ import pandas as pd
 
 ### Filter the items that has been replace ###
 # Set work directory
+#workdir = 'C:\\Users\\User\\Desktop\\wfforecast\\auto\\itemlist\\'
 workdir = 'Y:\\RPLitem_List\\'
 os.chdir(workdir)
 
@@ -26,31 +27,34 @@ select
     i.SALESDESCRIPTION,
     i.DATE_LAST_MODIFIED,
     s.LIST_ITEM_NAME,
-    i.ISINACTIVE
+    i.ISINACTIVE,
+    i.REPLACED_BY_NEW_ITEM,
+    i.REPLACED_FOR_OLD_ITEM,
+    i.ITEM_ID
 from
     ITEMS i,
     ITEM_STATUS s
 
 where
-    i.STATUS_ID = s.LIST_ID
-and
-    i.TYPE_NAME in ('Inventory Item')
-and
-    s.LIST_ITEM_NAME not like '%Part%'
+    i.STATUS_ID = s.LIST_ID and
+    i.TYPE_NAME in ('Inventory Item') and
+    s.LIST_ITEM_NAME not like '%Part%' and
+    i.SALESDESCRIPTION is not null
 """
 Inv_item = pd.read_sql(sql,conn)
 conn.close()
 
 Inv_item.index = Inv_item.FULL_NAME
 
-# Find items with missing value
-Inv_cols = list(Inv_item.columns.values)
-filled_err = list(map(lambda x: Inv_item[Inv_item[x].isna()], Inv_cols))
-filled_err = pd.concat(filled_err)
+## Find items with missing value
+#Inv_cols = list(Inv_item.columns.values)
+#filled_err = list(map(lambda x: Inv_item[Inv_item[x].isna()], Inv_cols))
+#filled_err = pd.concat(filled_err)
+#
+## Exclude items with missing value
+#Inv_item = Inv_item.drop(index= filled_err.index)
+##Inv_item.to_csv('Inv_item.csv')
 
-# Exclude items with missing value
-Inv_item = Inv_item.drop(index= filled_err.index)
-#Inv_item.to_csv('Inv_item.csv')
 # Find items name index have been replaced
 check_des = list(filter(lambda x: '@RPL' in Inv_item.SALESDESCRIPTION.loc[x], Inv_item.index))
 RPL_item = Inv_item[Inv_item.index.isin(check_des)]
@@ -61,7 +65,7 @@ RPL_item['NEW_NAME'] = list(map(lambda x: RPL_item.loc[x, 'SALESDESCRIPTION'][RP
 RPL_cols = list(RPL_item.columns.values)
 cols_new = RPL_cols[-1:] + RPL_cols[:-1]
 RPL_item = RPL_item[cols_new]
-RPL_item.to_csv('RPL_item.csv')
+
 # Check the correction of the slice way of new item name 
 # Set regular expression of item No. format
 label_err = []
@@ -94,10 +98,24 @@ for item in label_err.index:
 # Set new index prevent index duplicate
 RPL_item.index = list(range(len(RPL_item)))
 
+#Add new name rule---------------------------------------------------------------------------
+# Find items name index have been replaced
+An_RPL_item = Inv_item[~Inv_item.index.isin(check_des)]
+An_RPL_item=An_RPL_item[An_RPL_item["REPLACED_BY_NEW_ITEM"].notnull()]
+
+# Add new item name
+An_RPL_item['NEW_NAME'] = An_RPL_item['REPLACED_BY_NEW_ITEM']
+An_RPL_cols = list(An_RPL_item.columns.values)
+An_cols_new = An_RPL_cols[-1:] + An_RPL_cols[:-1]
+An_RPL_item = An_RPL_item[An_cols_new]
+An_RPL_item.index = list(range(len(An_RPL_item)))
+
+#Combine RPL and An_RPL
+RPL_item=pd.concat([RPL_item,An_RPL_item],axis=0)
 
 # Save RPL_item to a history CSV
 date = time.strftime("%Y%m%d")
-listname = workdir+ 'PRLind_list' +date+ '.csv'
+listname = workdir+ 'RPLind_list' +date+ '.csv'
 RPL_item.to_csv(listname, index = False)
 
 # Save a keep update CSV file
