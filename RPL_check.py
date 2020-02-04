@@ -15,9 +15,12 @@ import pandas as pd
 ### Filter the items that has been replace ###
 # Set work directory
 #workdir = 'C:\\Users\\User\\Desktop\\wfforecast\\auto\\itemlist\\'
-workdir = 'Y:\\RPLitem_List\\'
-os.chdir(workdir)
-
+try:
+    workdir = 'Y:\\RPLitem_List\\'
+    os.chdir(workdir)
+except:
+    workdir ="N:\\E Commerce\\Public Share\\! DOT COM DATA\\RPL\\"
+    os.chdir(workdir)
 # Connect Netsuite through OCBD and get the item information list 
 conn = pyodbc.connect('dsn=NetSuite;UID=RHung@Top-Line.com;PWD=Netsuite888')
 sql = """
@@ -112,6 +115,20 @@ An_RPL_item.index = list(range(len(An_RPL_item)))
 
 #Combine RPL and An_RPL
 RPL_item=pd.concat([RPL_item,An_RPL_item],axis=0)
+RPL_item.reset_index(inplace=True)
+
+#Third_check
+RPL_thr=RPL_item[['NEW_NAME','FULL_NAME']]
+RPL_thr=pd.merge(RPL_thr,RPL_thr,how='left',left_on='FULL_NAME',right_on='NEW_NAME')
+RPL_thr=RPL_thr[RPL_thr.NEW_NAME_y.notnull()][['NEW_NAME_x','FULL_NAME_y']]
+RPL_item=pd.merge(RPL_item,RPL_thr,how='left',left_on='FULL_NAME',right_on='FULL_NAME_y')
+
+RPL_item['NEW_NAME_x'].fillna(RPL_item['NEW_NAME'],inplace=True)
+RPL_item['NEW_NAME']=RPL_item['NEW_NAME_x']
+del  RPL_item['index'],RPL_item['NEW_NAME_x'],RPL_item['FULL_NAME_y']
+
+
+
 
 # Save RPL_item to a history CSV
 date = time.strftime("%Y%m%d")
